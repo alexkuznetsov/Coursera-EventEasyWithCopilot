@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EventEasy.csproj" />
+    <ProjectReference Include="..\EventEasy\EventEasy.csproj" />
   </ItemGroup>
 
 </Project>
