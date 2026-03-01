@@ -1,0 +1,63 @@
+@page "/events/{Id:int}"
+@inject NavigationManager Navigation
+@inject UserSessionTracker SessionTracker
+@inject AttendanceTracker AttendanceTracker
+
+<PageTitle>Event Details</PageTitle>
+
+@if (selectedEvent is null)
+{
+    <h1>Event not found</h1>
+    <NavLink class="btn btn-secondary" href="/events">Back to list</NavLink>
+}
+else
+{
+    var stats = AttendanceTracker.GetStats(selectedEvent.Id);
+
+    <h1>Event Details</h1>
+    <p class="text-muted">Edit event data using two-way binding in the Event Card.</p>
+
+    <div class="alert alert-light" role="status">
+        <strong>Attendance:</strong> @stats.Participants participants, @stats.TicketsReserved tickets reserved
+    </div>
+
+    <EventCard Event="selectedEvent" EventChanged="HandleEventSaved" IsEditable="true" ShowActions="false"/>
+
+    <div class="d-flex gap-2">
+        <NavLink class="btn btn-outline-secondary" href="/events">Back to list</NavLink>
+        <NavLink class="btn btn-primary" href="@($"/events/{selectedEvent.Id}/register")">Go to registration</NavLink>
+        <button type="button" class="btn btn-danger" @onclick="DeleteEvent">Delete Event</button>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private EventModel? selectedEvent;
+
+    protected override void OnParametersSet()
+    {
+        selectedEvent = EventRepository.GetById(Id);
+        SessionTracker.TrackPageView($"/events/{Id}");
+    }
+
+    private Task HandleEventSaved(EventModel updatedEvent)
+    {
+        EventRepository.Update(updatedEvent);
+        selectedEvent = updatedEvent;
+        Navigation.NavigateTo("/events");
+        return Task.CompletedTask;
+    }
+
+    private void DeleteEvent()
+    {
+        if (selectedEvent is null)
+        {
+            return;
+        }
+
+        EventRepository.Delete(selectedEvent.Id);
+        Navigation.NavigateTo("/events");
+    }
+
+}

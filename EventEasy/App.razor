@@ -1,0 +1,86 @@
+﻿@using System.Text.Json
+@using EventEasy.Pages
+@implements IDisposable
+@inject IJSRuntime JS
+@inject UserSessionTracker SessionTracker
+@inject NavigationManager Navigation
+
+<Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(NotFound)">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
+        <FocusOnNavigate RouteData="@routeData" Selector="h1"/>
+    </Found>
+</Router>
+
+@code {
+    private const string SessionStorageKey = "eventeasy.user-session";
+    private bool _restored;
+
+    protected override void OnInitialized()
+    {
+        SessionTracker.StateChanged += HandleSessionStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _restored)
+        {
+            return;
+        }
+
+        _restored = true;
+        await RestoreSessionAsync();
+
+        var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var route = string.IsNullOrWhiteSpace(relativePath) ? "/events" : $"/{relativePath}";
+        SessionTracker.TrackPageView(route);
+
+        StateHasChanged();
+    }
+
+    private void HandleSessionStateChanged()
+    {
+        _ = PersistSessionAsync();
+    }
+
+    private async Task RestoreSessionAsync()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string?>("localStorage.getItem", SessionStorageKey);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return;
+            }
+
+            var snapshot = JsonSerializer.Deserialize<UserSessionSnapshot>(json);
+            if (snapshot is not null)
+            {
+                SessionTracker.Restore(snapshot);
+            }
+        }
+        catch
+        {
+            // Keep default in-memory session when localStorage is unavailable or malformed.
+        }
+    }
+
+    private async Task PersistSessionAsync()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(SessionTracker.CreateSnapshot());
+            await JS.InvokeVoidAsync("localStorage.setItem", SessionStorageKey, json);
+        }
+        catch
+        {
+            // Ignore transient JS interop errors to keep the app functional.
+        }
+    }
+
+    public void Dispose()
+    {
+        SessionTracker.StateChanged -= HandleSessionStateChanged;
+    }
+
+}

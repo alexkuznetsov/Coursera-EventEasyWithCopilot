@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="EventEasy/EventEasy.csproj" />
+  <Project Path="EventEasy.Tests/EventEasy.Tests.csproj" />
+</Solution>

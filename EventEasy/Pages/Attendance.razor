@@ -1,0 +1,43 @@
+@page "/attendance"
+@inject UserSessionTracker SessionTracker
+@inject AttendanceTracker AttendanceTracker
+
+<PageTitle>Attendance Tracker</PageTitle>
+
+<h1>Attendance Tracker</h1>
+<p class="text-muted">Monitor participation across all events.</p>
+
+<div class="alert alert-info" role="status">
+    <strong>Session:</strong> @SessionTracker.SessionId[..8] |
+    <strong>Total registrations:</strong> @SessionTracker.RegistrationCount
+</div>
+
+<table class="table table-striped">
+    <thead>
+    <tr>
+        <th>Event</th>
+        <th>Participants</th>
+        <th>Tickets Reserved</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var evt in EventRepository.Events)
+    {
+        var stats = AttendanceTracker.GetStats(evt.Id);
+        <tr @key="evt.Id">
+            <td>@evt.Name</td>
+            <td>@stats.Participants</td>
+            <td>@stats.TicketsReserved</td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+@code {
+
+    protected override void OnInitialized()
+    {
+        SessionTracker.TrackPageView("/attendance");
+    }
+
+}

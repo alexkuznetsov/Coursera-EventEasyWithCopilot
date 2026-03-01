@@ -1,0 +1,33 @@
+@page "/events/new"
+@inject NavigationManager Navigation
+@inject UserSessionTracker SessionTracker
+
+<PageTitle>Create Event</PageTitle>
+
+<h1>Create Event</h1>
+<p class="text-muted">Add a new event with name, date, and location.</p>
+
+<EventCard Event="_newEvent" EventChanged="HandleEventCreated" IsEditable="true" ShowActions="false"/>
+
+<NavLink class="btn btn-outline-secondary mt-2" href="/events">Back to list</NavLink>
+
+@code {
+
+    private readonly EventModel _newEvent = new()
+    {
+            Date = DateTime.Today
+    };
+
+    protected override void OnInitialized()
+    {
+        SessionTracker.TrackPageView("/events/new");
+    }
+
+    private Task HandleEventCreated(EventModel model)
+    {
+        EventRepository.Create(model);
+        Navigation.NavigateTo("/events");
+        return Task.CompletedTask;
+    }
+
+}

@@ -1,0 +1,136 @@
+@using System.ComponentModel.DataAnnotations
+@implements IDisposable
+
+<article class="card mb-3 shadow-sm">
+    <div class="card-body">
+        @if (IsEditable)
+        {
+            <EditForm EditContext="_editContext" OnValidSubmit="SaveChangesAsync">
+                <DataAnnotationsValidator/>
+
+                <div class="mb-2">
+                    <label class="form-label">Event name</label>
+                    <InputText class="@($"form-control {GetFieldClass(nameof(EventModel.Name))}")"
+                               @bind-Value="_editableEvent.Name"/>
+                    <ValidationMessage For="() => _editableEvent.Name"/>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Date</label>
+                    <InputDate class="@($"form-control {GetFieldClass(nameof(EventModel.Date))}")"
+                               TValue="DateTime"
+                               @bind-Value="_editableEvent.Date"/>
+                    <ValidationMessage For="() => _editableEvent.Date"/>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Location</label>
+                    <InputText class="@($"form-control {GetFieldClass(nameof(EventModel.Location))}")"
+                               @bind-Value="_editableEvent.Location"/>
+                    <ValidationMessage For="() => _editableEvent.Location"/>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-sm mt-2" disabled="@(!_isFormValid)">Save</button>
+            </EditForm>
+        }
+        else
+        {
+            <h5 class="card-title">@Event.Name</h5>
+            <p class="card-text mb-1"><strong>Date:</strong> @Event.Date.ToString("MMMM dd, yyyy")</p>
+            <p class="card-text"><strong>Location:</strong> @Event.Location</p>
+        }
+
+        @if (ShowActions)
+        {
+            <div class="d-flex gap-2 mt-2">
+                <NavLink class="btn btn-outline-primary btn-sm" href="@($"/events/{Event.Id}")">Details</NavLink>
+                <NavLink class="btn btn-primary btn-sm" href="@($"/events/{Event.Id}/register")">Register</NavLink>
+            </div>
+        }
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public EventModel Event { get; set; } = default!;
+
+    [Parameter] public EventCallback<EventModel> EventChanged { get; set; }
+
+    [Parameter] public bool IsEditable { get; set; }
+
+    [Parameter] public bool ShowActions { get; set; } = true;
+
+    private EventModel _editableEvent = new();
+    private EditContext _editContext = default!;
+    private bool _isFormValid;
+    private int _lastEventId = -1;
+
+    protected override void OnParametersSet()
+    {
+        if (!IsEditable)
+        {
+            return;
+        }
+
+        if (_editContext is null || _lastEventId != Event.Id)
+        {
+            InitializeEditState();
+        }
+    }
+
+    private void InitializeEditState()
+    {
+        if (_editContext is not null)
+        {
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+        }
+
+        _editableEvent = new EventModel
+        {
+                Id = Event.Id,
+                Name = Event.Name,
+                Date = Event.Date,
+                Location = Event.Location
+        };
+
+        _editContext = new EditContext(_editableEvent);
+        _editContext.OnFieldChanged += HandleFieldChanged;
+        _isFormValid = IsModelValid(_editableEvent);
+        _lastEventId = Event.Id;
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        _isFormValid = IsModelValid(_editableEvent);
+        StateHasChanged();
+    }
+
+    private string GetFieldClass(string fieldName)
+    {
+        var fieldState = _editContext.GetValidationMessages(new FieldIdentifier(_editableEvent, fieldName)).Any();
+        return fieldState ? "invalid" : string.Empty;
+    }
+
+    private async Task SaveChangesAsync()
+    {
+        Event.Name = _editableEvent.Name;
+        Event.Date = _editableEvent.Date;
+        Event.Location = _editableEvent.Location;
+
+        await EventChanged.InvokeAsync(Event);
+    }
+
+    private static bool IsModelValid(EventModel model)
+    {
+        var validationResults = new List<ValidationResult>();
+        return Validator.TryValidateObject(model, new ValidationContext(model), validationResults, true);
+    }
+
+    public void Dispose()
+    {
+        if (_editContext is not null)
+        {
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+        }
+    }
+
+}

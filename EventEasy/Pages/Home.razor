@@ -1,0 +1,44 @@
+@page "/"
+@page "/events"
+@inject UserSessionTracker SessionTracker
+@inject AttendanceTracker AttendanceTracker
+
+<PageTitle>Event List</PageTitle>
+
+<h1>Event List</h1>
+<p class="text-muted">Browse available events and open details or registration.</p>
+<NavLink class="btn btn-success mb-3" href="/events/new">Add Event</NavLink>
+
+<div class="alert alert-info" role="status">
+    <strong>Session:</strong> @SessionTracker.SessionId[..8] |
+    <strong>Registrations:</strong> @SessionTracker.RegistrationCount |
+    <strong>Unique events:</strong> @SessionTracker.RegisteredEventIds.Count
+</div>
+
+@foreach (var eventItem in events)
+{
+    var stats = AttendanceTracker.GetStats(eventItem.Id);
+
+    <div @key="eventItem.Id">
+        <EventCard Event="eventItem" EventChanged="OnEventChanged"/>
+        <div class="small text-muted mb-3">
+            Attendance: @stats.Participants participants, @stats.TicketsReserved tickets reserved
+        </div>
+    </div>
+}
+
+@code {
+    private List<EventModel> events = [];
+
+    protected override void OnInitialized()
+    {
+        events = EventRepository.Events;
+        SessionTracker.TrackPageView("/events");
+    }
+
+    private static Task OnEventChanged(EventModel _)
+    {
+        return Task.CompletedTask;
+    }
+
+}

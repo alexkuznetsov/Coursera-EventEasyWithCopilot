@@ -1,0 +1,131 @@
+@using System.ComponentModel.DataAnnotations
+@implements IDisposable
+
+@page "/events/{Id:int}/register"
+@inject UserSessionTracker SessionTracker
+@inject AttendanceTracker AttendanceTracker
+
+<PageTitle>Event Registration</PageTitle>
+
+@if (selectedEvent is null)
+{
+    <h1>Event not found</h1>
+    <NavLink class="btn btn-secondary" href="/events">Back to list</NavLink>
+}
+else
+{
+    var stats = AttendanceTracker.GetStats(selectedEvent.Id);
+
+    <h1>Registration</h1>
+    <p><strong>@selectedEvent.Name</strong> - @selectedEvent.Date.ToString("MMMM dd, yyyy") - @selectedEvent.Location
+    </p>
+
+    <div class="alert alert-info" role="status">
+        <strong>Session:</strong> @SessionTracker.SessionId[..8] |
+        <strong>Last route:</strong> @SessionTracker.LastVisitedRoute |
+        <strong>Current attendance:</strong> @stats.Participants participants
+    </div>
+
+    <EditForm EditContext="_editContext" OnValidSubmit="SubmitRegistration">
+        <DataAnnotationsValidator/>
+        <ValidationSummary/>
+
+        <div class="mb-3">
+            <label class="form-label">Full name</label>
+            <InputText class="@($"form-control {GetFieldClass(nameof(EventRegistrationModel.FullName))}")"
+                       @bind-Value="registration.FullName"/>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <InputText class="@($"form-control {GetFieldClass(nameof(EventRegistrationModel.Email))}")"
+                       @bind-Value="registration.Email"/>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Tickets</label>
+            <InputNumber class="@($"form-control {GetFieldClass(nameof(EventRegistrationModel.Tickets))}")"
+                         @bind-Value="registration.Tickets"/>
+        </div>
+
+        <button type="submit" class="btn btn-primary" disabled="@(!_isFormValid)">Submit registration</button>
+        <NavLink class="btn btn-outline-secondary ms-2" href="@($"/events/{Id}")">Back to details</NavLink>
+    </EditForm>
+
+    @if (!string.IsNullOrWhiteSpace(submitMessage))
+    {
+        <div class="alert alert-success mt-3" role="alert">@submitMessage</div>
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private EventModel? selectedEvent;
+    private EventRegistrationModel registration = new();
+    private string? submitMessage;
+    private EditContext _editContext = default!;
+    private bool _isFormValid;
+
+    protected override void OnParametersSet()
+    {
+        selectedEvent = EventRepository.GetById(Id);
+        submitMessage = null;
+        SessionTracker.TrackPageView($"/events/{Id}/register");
+        InitializeRegistrationForm();
+    }
+
+    private void InitializeRegistrationForm()
+    {
+        if (_editContext is not null)
+        {
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+        }
+
+        registration = new EventRegistrationModel();
+        _editContext = new EditContext(registration);
+        _editContext.OnFieldChanged += HandleFieldChanged;
+        _isFormValid = IsModelValid(registration);
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        _isFormValid = IsModelValid(registration);
+        StateHasChanged();
+    }
+
+    private string GetFieldClass(string fieldName)
+    {
+        var hasError = _editContext.GetValidationMessages(new FieldIdentifier(registration, fieldName)).Any();
+        return hasError ? "invalid" : string.Empty;
+    }
+
+    private void SubmitRegistration()
+    {
+        if (selectedEvent is null)
+        {
+            return;
+        }
+
+        AttendanceTracker.RecordRegistration(selectedEvent.Id, registration.Tickets);
+        SessionTracker.TrackRegistration(selectedEvent.Id, registration.FullName, registration.Email);
+
+        var currentStats = AttendanceTracker.GetStats(selectedEvent.Id);
+        submitMessage = $"Registration completed for {registration.FullName}. Total participants: {currentStats.Participants}.";
+    }
+
+    private static bool IsModelValid(EventRegistrationModel model)
+    {
+        var validationResults = new List<ValidationResult>();
+        return Validator.TryValidateObject(model, new ValidationContext(model), validationResults, true);
+    }
+
+    public void Dispose()
+    {
+        if (_editContext is not null)
+        {
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+        }
+    }
+
+}
